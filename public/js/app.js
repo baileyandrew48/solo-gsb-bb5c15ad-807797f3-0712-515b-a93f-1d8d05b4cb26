@@ -52,6 +52,10 @@
     batchHint: document.getElementById('batchHint'),
     batchRunBtn: document.getElementById('batchRunBtn'),
     batchResult: document.getElementById('batchResult'),
+    reconList: document.getElementById('reconList'),
+    reconHint: document.getElementById('reconHint'),
+    reconRunBtn: document.getElementById('reconRunBtn'),
+    reconResult: document.getElementById('reconResult'),
     printBtn: document.getElementById('printBtn'),
     status: document.getElementById('status'),
     stage: document.getElementById('stage'),
@@ -1282,6 +1286,7 @@
   // CSV 输入提示：实时解析并汇总记录数与逐条校验错误（不排版、不改变成品）
   function updateBatchHint() {
     el.batchResult.hidden = true;
+    clearReconResult(); // CSV 变化：馆藏号对账的旧结果同时失效
     invalidateBatchSheets('CSV 内容已修改：异款拼版已失效，请重新点击「开始校样」生成。');
     var raw = el.batchCsv.value;
     el.batchHint.classList.remove('err');
@@ -1492,6 +1497,144 @@
     el.bodyRev.value = ''; // 清空修订稿：恢复原稿为成品
     updateRevCount(false);
     render();
+  }
+
+  // ---------- 馆藏号对账 ----------
+  // 使用「批量校样」区 CSV 的额外 accession 列（各记录必填）与另行粘贴的
+  // 馆藏登记清单（每行一项）核对；号码/号段解析、展开与比较规则见 recon.js。
+  // 对账只读：不改动任何面板输入，不影响校样、拼版与打印；
+  // CSV 或登记清单任一变化即清空旧结果（CSV 变化的清理见 updateBatchHint）。
+
+  function clearReconResult() {
+    el.reconResult.hidden = true;
+    el.reconResult.innerHTML = '';
+  }
+
+  // 登记清单输入提示：实时解析并汇总项数与展开号码数（不执行对账）
+  function updateReconHint() {
+    clearReconResult();
+    var raw = el.reconList.value;
+    el.reconHint.classList.remove('err');
+    if (!String(raw).trim()) {
+      el.reconHint.textContent = '未粘贴登记清单';
+      return;
+    }
+    var reg = window.LabelRecon.parseRegistry(raw);
+    if (reg.errors.length) {
+      el.reconHint.textContent = reg.errors.join('\n');
+      el.reconHint.classList.add('err');
+      return;
+    }
+    el.reconHint.textContent = '已识别 ' + reg.items.length + ' 项，展开共 ' + reg.total +
+      ' 个号码；点击「开始对账」与 CSV 的 accession 列核对。';
+  }
+
+  function showReconErrors(errors) {
+    el.reconResult.innerHTML = '';
+    var div = document.createElement('div');
+    div.className = 'recon-result-errs';
+    div.textContent = '对账未执行，请先修正以下问题：\n' + errors.join('\n');
+    el.reconResult.appendChild(div);
+    el.reconResult.hidden = false;
+  }
+
+  // 点击「开始对账」：分别展开两侧后按完整号码核对（只读，不影响校样/拼版/打印）
+  function runReconcile() {
+    var csvSide = window.LabelRecon.extractCsv(el.batchCsv.value);
+    var regSide = window.LabelRecon.parseRegistry(el.reconList.value);
+
+    var errors = [];
+    if (csvSide.errors.length) {
+      csvSide.errors.forEach(function (e) { errors.push('【CSV 侧】' + e); });
+    }
+    if (!String(el.reconList.value).trim()) {
+      errors.push('【登记清单侧】请粘贴馆藏登记清单（每行一项，空行忽略）。');
+    } else if (regSide.errors.length) {
+      regSide.errors.forEach(function (e) { errors.push('【登记清单侧】' + e); });
+    } else if (!regSide.items.length) {
+      errors.push('【登记清单侧】未识别到有效号码：每行填写一个号码或同前缀号段。');
+    }
+    if (errors.length) {
+      showReconErrors(errors);
+      return;
+    }
+
+    renderReconResult(csvSide, regSide, window.LabelRecon.reconcile(csvSide.items, regSide.items));
+  }
+
+  // 对账结果：汇总 + 四类差异表（CSV 内重号、清单内重号、仅 CSV、仅清单）
+  function renderReconResult(csvSide, regSide, res) {
+    el.reconResult.innerHTML = '';
+    el.reconResult.hidden = false;
+
+    var head = document.createElement('div');
+    head.className = 'recon-result-head';
+    head.textContent = '对账依据（只读，不改变校样、拼版与打印）：CSV 侧 ' + csvSide.items.length +
+      ' 条记录展开 ' + res.csvTotal + ' 个号码 · 登记清单侧 ' + regSide.items.length +
+      ' 行展开 ' + res.listTotal + ' 个号码 · 两侧共同 ' + res.matched + ' 个；' +
+      '顺序不同不算差异。CSV 或清单修改后本结果自动清空。';
+    el.reconResult.appendChild(head);
+
+    var diffKinds = [
+      res.csvDupes.length ? 'CSV 内重号 ' + res.csvDupes.length + ' 个' : null,
+      res.listDupes.length ? '清单内重号 ' + res.listDupes.length + ' 个' : null,
+      res.onlyCsv.length ? '仅 CSV 有 ' + res.onlyCsv.length + ' 个' : null,
+      res.onlyList.length ? '仅清单有 ' + res.onlyList.length + ' 个' : null
+    ].filter(function (t) { return !!t; });
+
+    if (!diffKinds.length) {
+      var ok = document.createElement('div');
+      ok.className = 'recon-result-ok';
+      ok.textContent = '✓ 账实相符：两侧 ' + res.matched +
+        ' 个号码一一对应，无重号、无缺失。';
+      el.reconResult.appendChild(ok);
+      return;
+    }
+
+    var summary = document.createElement('div');
+    summary.className = 'recon-result-errs';
+    summary.textContent = '✗ 发现差异：' + diffKinds.join('、') + '（明细见下表）。';
+    el.reconResult.appendChild(summary);
+
+    addReconTable('CSV 内重号（含号段交叠）', res.csvDupes);
+    addReconTable('登记清单内重号（含号段交叠）', res.listDupes);
+    addReconTable('仅在 CSV 中的号码（登记清单缺失）', res.onlyCsv);
+    addReconTable('仅在登记清单中的号码（CSV 缺失）', res.onlyList);
+  }
+
+  // 单类差异表：号码 + 来源行（号码为定宽格式，已按字典序排列）
+  function addReconTable(title, rows) {
+    if (!rows.length) return;
+    var cap = document.createElement('div');
+    cap.className = 'recon-table-cap';
+    cap.textContent = title + '（' + rows.length + ' 个）';
+    el.reconResult.appendChild(cap);
+
+    var table = document.createElement('table');
+    table.className = 'recon-table';
+    var thead = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    ['号码', '来源'].forEach(function (txt) {
+      var th = document.createElement('th');
+      th.textContent = txt;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      var numTd = document.createElement('td');
+      numTd.textContent = row.number;
+      numTd.className = 'bad';
+      var srcTd = document.createElement('td');
+      srcTd.textContent = row.sources.join('、');
+      tr.appendChild(numTd);
+      tr.appendChild(srcTd);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    el.reconResult.appendChild(table);
   }
 
   function showError(message) {
@@ -2017,9 +2160,16 @@
   el.batchCsv.addEventListener('change', updateBatchHint);
   el.batchRunBtn.addEventListener('click', runBatchProof);
 
+  // 馆藏号对账：登记清单输入仅更新提示并清空上次对账结果（CSV 变化的清理见
+  // updateBatchHint）；点击「开始对账」才核对，只读、不影响校样/拼版/打印
+  el.reconList.addEventListener('input', updateReconHint);
+  el.reconList.addEventListener('change', updateReconHint);
+  el.reconRunBtn.addEventListener('click', runReconcile);
+
   updateRevCount(false);
   updateStockHint();
   updateBatchHint();
+  updateReconHint();
   paginateBatchSheets(); // 初始空态：提示先粘贴 CSV 校样
 
   el.printBtn.addEventListener('click', function () {

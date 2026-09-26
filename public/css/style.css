@@ -213,10 +213,11 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
   margin: 6px 0 8px;
 }
 
-/* 两版排版对比表、库存规格选型结果表与批量校样结果表 */
+/* 两版排版对比表、库存规格选型结果表、批量校样结果表与馆藏号对账结果表 */
 .fit-table,
 .stock-table,
-.batch-table {
+.batch-table,
+.recon-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
@@ -227,7 +228,9 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
 .stock-table th,
 .stock-table td,
 .batch-table th,
-.batch-table td {
+.batch-table td,
+.recon-table th,
+.recon-table td {
   border: 1px solid var(--line);
   padding: 4px 6px;
   text-align: left;
@@ -235,16 +238,19 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
 }
 .fit-table th,
 .stock-table th,
-.batch-table th {
+.batch-table th,
+.recon-table th {
   background: #f0f1f4;
   font-weight: 600;
 }
 .fit-table td.good,
 .stock-table td.good,
-.batch-table td.good { color: #2f6f44; }
+.batch-table td.good,
+.recon-table td.good { color: #2f6f44; }
 .fit-table td.bad,
 .stock-table td.bad,
-.batch-table td.bad { color: var(--danger); }
+.batch-table td.bad,
+.recon-table td.bad { color: var(--danger); }
 
 .fit-delta {
   font-size: 12px;
@@ -345,6 +351,48 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
   padding: 3px 12px;
   font-size: 12px;
   letter-spacing: 1px;
+}
+
+/* ========== 馆藏号对账 ========== */
+.recon {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-bottom: 14px;
+}
+.recon-title {
+  font-size: 13px;
+  margin: 0 0 8px;
+  letter-spacing: 1px;
+}
+.recon-note {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.recon-result {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.recon-result-head {
+  color: var(--muted);
+  margin: 6px 0;
+  white-space: pre-line;
+}
+.recon-result-ok {
+  color: #2f6f44;
+  font-weight: 600;
+  margin: 6px 0;
+}
+.recon-result-errs {
+  color: var(--danger);
+  margin-bottom: 6px;
+  white-space: pre-line;
+}
+.recon-table-cap {
+  font-weight: 600;
+  margin: 8px 0 4px;
 }
 
 /* ========== 异款批量拼版 ========== */

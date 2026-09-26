@@ -107,6 +107,23 @@
       <div id="batchResult" class="batch-result" hidden></div>
     </section>
 
+    <section class="recon">
+      <h2 class="recon-title">馆藏号对账 <span class="compare-sub">CSV 的 accession 列对照馆藏登记清单，只读不改成品</span></h2>
+      <p class="recon-note">使用上方「批量校样」区粘贴的 CSV：表头需含额外的 accession 列，且各记录的
+        accession 均须填写。号码格式为「年份.批次.三位流水号」（如 2024.03.001），允许同前缀闭区间
+        （如 2024.03.001-005），展开保留三位宽度；格式错误、倒序或任一侧展开超过 200 个号码都会被拒绝
+        并指出来源行。在下方粘贴馆藏登记清单（每行一项）后点击「开始对账」。</p>
+      <label class="field">
+        <span class="field-label">馆藏登记清单（每行一项：单个号码或同前缀号段，空行忽略）</span>
+        <textarea id="reconList" rows="5" placeholder="如：&#10;2024.03.001-005&#10;2024.03.008&#10;2024.03.010&#10;每侧展开不超过 200 个号码；顺序不同不算差异。"></textarea>
+        <span class="field-hint multiline" id="reconHint">未粘贴登记清单</span>
+      </label>
+      <div class="actions">
+        <button id="reconRunBtn" type="button">开始对账（只读，不改变校样、拼版与打印）</button>
+      </div>
+      <div id="reconResult" class="recon-result" hidden></div>
+    </section>
+
     <section class="batch-sheet-ctrl">
       <h2 class="batch-sheet-ctrl-title">异款批量拼版打印 <span class="compare-sub">校样通过的不同记录按原顺序拼满 A4</span></h2>
       <p class="batch-sheet-note">沿用上方「批量校样」的 CSV 入口：点击「开始校样」后，通过校验的记录各自独立生成展签，
@@ -224,6 +241,12 @@
           右侧「异款批量拼版预览」分页展示每页每张位置，与打印输出逐格对应；
           单页连一张都放不下时提示展签尺寸与纸内可用尺寸并禁用异款拼版打印；
           修改尺寸、段落对齐、专名、术语、二维码或 CSV 后拼版失效，需重新点击「开始校样」。</li>
+        <li><strong>馆藏号对账</strong>：使用「批量校样」CSV 的额外 accession 列（各记录必填）
+          与另行粘贴的馆藏登记清单（每行一项）核对；号码为「年份.批次.三位流水号」，
+          允许同前缀闭区间（如 2024.03.001-005），展开保留三位宽度；格式错误、倒序或
+          任一侧展开超过 200 个号码都会被拒绝并指出来源行。按展开后的完整号码列出
+          CSV 内与清单内的重号（含号段交叠）、仅在 CSV 与仅在清单中的号码及来源；
+          顺序不同不算差异。对账只读，不改变校样、拼版与打印；CSV 或清单任一修改即清空旧结果。</li>
       </ul>
     </details>
   </aside>
@@ -267,6 +290,7 @@
 <script src="/js/terms.js"></script>
 <script src="/js/qrcode.js"></script>
 <script src="/js/batch.js"></script>
+<script src="/js/recon.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>
