@@ -213,10 +213,11 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
   margin: 6px 0 8px;
 }
 
-/* 两版排版对比表、库存规格选型结果表与批量校样结果表 */
+/* 两版排版对比表、库存规格选型结果表、批量校样结果表与馆藏号对账差异表 */
 .fit-table,
 .stock-table,
-.batch-table {
+.batch-table,
+.acc-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
@@ -227,7 +228,9 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
 .stock-table th,
 .stock-table td,
 .batch-table th,
-.batch-table td {
+.batch-table td,
+.acc-table th,
+.acc-table td {
   border: 1px solid var(--line);
   padding: 4px 6px;
   text-align: left;
@@ -235,7 +238,8 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
 }
 .fit-table th,
 .stock-table th,
-.batch-table th {
+.batch-table th,
+.acc-table th {
   background: #f0f1f4;
   font-weight: 600;
 }
@@ -363,6 +367,59 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
   line-height: 1.6;
   color: var(--muted);
   margin: 0 0 8px;
+}
+
+/* ========== 馆藏号对账 ========== */
+.acc-recon {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-bottom: 14px;
+}
+.acc-recon-title {
+  font-size: 13px;
+  margin: 0 0 8px;
+  letter-spacing: 1px;
+}
+.acc-recon-note {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.acc-result {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.acc-result-head {
+  color: var(--muted);
+  margin: 6px 0;
+  white-space: pre-line;
+}
+.acc-result-ok {
+  color: #2f6f44;
+  font-weight: 600;
+  margin: 6px 0;
+}
+.acc-result-errs {
+  color: var(--danger);
+  margin-bottom: 6px;
+  white-space: pre-line;
+}
+.acc-sub {
+  color: var(--danger);
+  font-weight: 600;
+  margin: 8px 0 4px;
+}
+/* 差异号码较多时表格内部滚动，避免撑长面板 */
+.acc-table-wrap {
+  max-height: 220px;
+  overflow: auto;
+  margin-bottom: 6px;
+}
+.acc-no {
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  white-space: nowrap;
 }
 
 /* ========== 右侧预览舞台 ========== */

@@ -140,12 +140,15 @@
    * @returns {{errors:string[],
    *            records:Array<{no:number,line:number,cells:string[],
    *                           title:string,zh:string,en:string,
-   *                           valid:boolean,error:string|null}>}}
+   *                           valid:boolean,error:string|null}>,
+   *            colIndex:Object<string,number>|null, colCount:number}}
    *   errors 为阻塞性整体错误（解析失败、表头缺列/重复、无记录、超过 20 条）；
-   *   records 为数据记录（记录号 no 从 1 起），valid=false 时 error 给出原因。
+   *   records 为数据记录（记录号 no 从 1 起），valid=false 时 error 给出原因；
+   *   colIndex 为表头列名（去首尾空白、小写）到列号的映射，供取用 accession
+   *   等额外列（表头校验失败时为 null）；colCount 为表头列数。
    */
   function buildBatch(text) {
-    var result = { errors: [], records: [] };
+    var result = { errors: [], records: [], colIndex: null, colCount: 0 };
 
     var parsed = parseCsv(text);
     if (parsed.errors.length) {
@@ -186,6 +189,8 @@
     }
 
     var colCount = headerCells.length;
+    result.colIndex = colIndex;
+    result.colCount = colCount;
     var dataRows = parsed.rows.slice(1);
     if (!dataRows.length) {
       result.errors.push('CSV 中没有数据记录：表头之后每行一条，至少 1 条、最多 ' +

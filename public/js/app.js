@@ -52,6 +52,10 @@
     batchHint: document.getElementById('batchHint'),
     batchRunBtn: document.getElementById('batchRunBtn'),
     batchResult: document.getElementById('batchResult'),
+    accRegistry: document.getElementById('accRegistry'),
+    accHint: document.getElementById('accHint'),
+    accRunBtn: document.getElementById('accRunBtn'),
+    accResult: document.getElementById('accResult'),
     printBtn: document.getElementById('printBtn'),
     status: document.getElementById('status'),
     stage: document.getElementById('stage'),
@@ -1283,6 +1287,7 @@
   function updateBatchHint() {
     el.batchResult.hidden = true;
     invalidateBatchSheets('CSV 内容已修改：异款拼版已失效，请重新点击「开始校样」生成。');
+    clearAccessionResult(); // CSV 变化后旧对账结果失效
     var raw = el.batchCsv.value;
     el.batchHint.classList.remove('err');
     if (!String(raw).trim()) {
@@ -1492,6 +1497,193 @@
     el.bodyRev.value = ''; // 清空修订稿：恢复原稿为成品
     updateRevCount(false);
     render();
+  }
+
+  // ---------- 馆藏号对账 ----------
+  // 沿用「批量校样」的 CSV（表头须含 accession 列且各记录非空）与另行粘贴的
+  // 馆藏登记清单（每行一项）核对；号码格式、区间展开与差异计算见 accession.js。
+  // 对账只读：不改变校样结果、拼版与打印；CSV 或清单任一变化即清空旧结果。
+
+  function regLineLabel(line) { return '第 ' + line + ' 行'; }
+  function csvRecLabel(no) { return '第 ' + no + ' 条记录'; }
+
+  function clearAccessionResult() {
+    el.accResult.hidden = true;
+    el.accResult.innerHTML = '';
+  }
+
+  // 清单输入提示：实时解析并校验格式与展开上限（不展开保存），并清空旧对账结果
+  function updateAccessionHint() {
+    clearAccessionResult();
+    var raw = el.accRegistry.value;
+    el.accHint.classList.remove('err');
+    if (!String(raw).trim()) {
+      el.accHint.textContent = '未粘贴登记清单';
+      return;
+    }
+    var reg = window.LabelAccession.parseRegistry(raw);
+    var side = window.LabelAccession.expandSide(reg.items, '登记清单', regLineLabel);
+    if (side.errors.length) {
+      el.accHint.textContent = '已识别 ' + reg.items.length + ' 项，但存在错误：\n' +
+        side.errors.join('\n');
+      el.accHint.classList.add('err');
+      return;
+    }
+    el.accHint.textContent = '已识别 ' + reg.items.length + ' 项，展开共 ' +
+      side.numbers.length + ' 个号码；点击「开始对账」与 CSV 的 accession 列核对。';
+  }
+
+  function showAccessionError(message) {
+    el.accResult.innerHTML = '';
+    var div = document.createElement('div');
+    div.className = 'acc-result-errs';
+    div.textContent = message;
+    el.accResult.appendChild(div);
+    el.accResult.hidden = false;
+  }
+
+  // 点击「开始对账」：核对 CSV 的 accession 列与馆藏登记清单（只读）
+  function runAccessionReconcile() {
+    // CSV 侧：沿用批量校样入口，须含 accession 列且各记录非空
+    var batch = window.LabelBatch.buildBatch(el.batchCsv.value);
+    if (batch.errors.length) {
+      showAccessionError('批量校样 CSV 有误，无法对账：\n' + batch.errors.join('\n'));
+      return;
+    }
+    var accCol = batch.colIndex ? batch.colIndex.accession : undefined;
+    if (accCol === undefined) {
+      showAccessionError('CSV 表头缺少 accession 列：请在批量校样 CSV 中增加 accession 列' +
+        '（表头须含 title,zh,en,accession，顺序任意，可含其他额外列），各记录的馆藏号必填。');
+      return;
+    }
+    var csvItems = [];
+    var csvErrs = [];
+    batch.records.forEach(function (rec) {
+      if (rec.cells.length !== batch.colCount) {
+        csvErrs.push('CSV 第 ' + rec.no + ' 条记录列数不符（本记录 ' + rec.cells.length +
+          ' 列，表头 ' + batch.colCount + ' 列），无法定位 accession 列；请先修正该记录。');
+        return;
+      }
+      var raw = String(rec.cells[accCol] == null ? '' : rec.cells[accCol]).trim();
+      if (!raw) {
+        csvErrs.push('CSV 第 ' + rec.no + ' 条记录的 accession 为空：对账要求各记录馆藏号必填。');
+        return;
+      }
+      csvItems.push({ text: raw, line: rec.no });
+    });
+    if (csvErrs.length) {
+      showAccessionError(csvErrs.join('\n'));
+      return;
+    }
+    var csvSide = window.LabelAccession.expandSide(csvItems, 'CSV', csvRecLabel);
+    if (csvSide.errors.length) {
+      showAccessionError(csvSide.errors.join('\n'));
+      return;
+    }
+
+    // 登记清单侧：每行一项，空行忽略
+    var reg = window.LabelAccession.parseRegistry(el.accRegistry.value);
+    if (!reg.items.length) {
+      showAccessionError('请在上方粘贴馆藏登记清单（每行一项：号码或同前缀区间，空行忽略）。');
+      return;
+    }
+    var regSide = window.LabelAccession.expandSide(reg.items, '登记清单', regLineLabel);
+    if (regSide.errors.length) {
+      showAccessionError(regSide.errors.join('\n'));
+      return;
+    }
+
+    renderAccessionResult(
+      window.LabelAccession.reconcile(csvSide.numbers, regSide.numbers));
+  }
+
+  // 差异小节表格：号码列等宽显示，表格过高时内部滚动
+  function appendAccTable(title, headers, rows) {
+    if (!rows.length) return;
+    var sub = document.createElement('div');
+    sub.className = 'acc-sub';
+    sub.textContent = title + '（' + rows.length + ' 个号码）';
+    el.accResult.appendChild(sub);
+    var wrap = document.createElement('div');
+    wrap.className = 'acc-table-wrap';
+    var table = document.createElement('table');
+    table.className = 'acc-table';
+    var thead = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    headers.forEach(function (txt) {
+      var th = document.createElement('th');
+      th.textContent = txt;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    rows.forEach(function (cells) {
+      var tr = document.createElement('tr');
+      cells.forEach(function (txt, idx) {
+        var td = document.createElement('td');
+        td.textContent = txt;
+        if (idx === 0) td.className = 'acc-no';
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    el.accResult.appendChild(wrap);
+  }
+
+  function joinRecNos(lines) {
+    return lines.map(function (no) { return '第 ' + no + ' 条'; }).join('、');
+  }
+
+  function joinLineNos(lines) {
+    return lines.map(function (no) { return '第 ' + no + ' 行'; }).join('、');
+  }
+
+  // 对账结果：摘要 + 各差异小节；全部一致时给出绿色结论
+  function renderAccessionResult(res) {
+    el.accResult.innerHTML = '';
+    el.accResult.hidden = false;
+
+    var head = document.createElement('div');
+    head.className = 'acc-result-head';
+    head.textContent = '对账依据（只读，不改变校样、拼版与打印）：CSV 侧展开 ' +
+      res.csvTotal + ' 个号码（去重 ' + res.csvUnique + ' 个），登记清单侧展开 ' +
+      res.regTotal + ' 个（去重 ' + res.regUnique + ' 个），两侧共有 ' + res.common +
+      ' 个；顺序不同不算差异。修改 CSV 或清单后本结果自动清空，需重新对账。';
+    el.accResult.appendChild(head);
+
+    var diffCount = res.csvDupes.length + res.regDupes.length +
+      res.onlyCsv.length + res.onlyReg.length;
+    if (!diffCount) {
+      var ok = document.createElement('div');
+      ok.className = 'acc-result-ok';
+      ok.textContent = '✓ 对账一致：两侧号码集合完全相同，且各自内部无重号。';
+      el.accResult.appendChild(ok);
+      return;
+    }
+
+    appendAccTable('CSV 内重号（含号段交叠）',
+      ['号码', '次数', '来源（CSV 记录）'],
+      res.csvDupes.map(function (d) {
+        return [d.no, d.count + ' 次', joinRecNos(d.lines)];
+      }));
+    appendAccTable('登记清单内重号（含号段交叠）',
+      ['号码', '次数', '来源（清单行）'],
+      res.regDupes.map(function (d) {
+        return [d.no, d.count + ' 次', joinLineNos(d.lines)];
+      }));
+    appendAccTable('仅在 CSV 中的号码（登记清单缺失）',
+      ['号码', '来源（CSV 记录）'],
+      res.onlyCsv.map(function (d) {
+        return [d.no, joinRecNos(d.lines)];
+      }));
+    appendAccTable('仅在登记清单中的号码（CSV 缺失）',
+      ['号码', '来源（清单行）'],
+      res.onlyReg.map(function (d) {
+        return [d.no, joinLineNos(d.lines)];
+      }));
   }
 
   function showError(message) {
@@ -2017,9 +2209,16 @@
   el.batchCsv.addEventListener('change', updateBatchHint);
   el.batchRunBtn.addEventListener('click', runBatchProof);
 
+  // 馆藏号对账：清单输入仅更新提示并清空旧对账结果（CSV 变化的清空见 updateBatchHint）；
+  // 点击「开始对账」才核对，对账只读、不参与排版与打印
+  el.accRegistry.addEventListener('input', updateAccessionHint);
+  el.accRegistry.addEventListener('change', updateAccessionHint);
+  el.accRunBtn.addEventListener('click', runAccessionReconcile);
+
   updateRevCount(false);
   updateStockHint();
   updateBatchHint();
+  updateAccessionHint();
   paginateBatchSheets(); // 初始空态：提示先粘贴 CSV 校样
 
   el.printBtn.addEventListener('click', function () {
